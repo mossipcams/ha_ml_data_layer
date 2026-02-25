@@ -6,7 +6,7 @@ from pathlib import Path
 
 import appdaemon.plugins.hass.hassapi as hass
 
-from appdaemon_ml.app import AppDaemonMLDataLayer as CoreDataLayer
+from .appdaemon_ml.app import AppDaemonMLDataLayer as CoreDataLayer
 
 
 class AppDaemonMLDataLayer(hass.Hass):
