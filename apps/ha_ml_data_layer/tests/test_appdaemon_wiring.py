@@ -45,3 +45,38 @@ def test_initialize_registers_event_listener_and_nightly_schedule(monkeypatch) -
     assert events[0][0] == "state_changed"
     assert len(schedules) == 1
     assert schedules[0][1] == "03:30:00"
+
+
+def test_on_ha_event_only_records_important_entities_and_states() -> None:
+    _install_fake_appdaemon_hass()
+    module = importlib.import_module("ha_ml_data_layer")
+    app = module.AppDaemonMLDataLayer.__new__(module.AppDaemonMLDataLayer)
+
+    calls: list[dict] = []
+
+    class FakeCore:
+        def handle_event(self, **kwargs):
+            calls.append(kwargs)
+
+    app._core = FakeCore()
+    app._important_observations = {
+        "sensor.matts_iphone_ble_area": {"Bedroom", "Living Room"},
+        "binary_sensor.bedtime": {"on"},
+    }
+
+    app._on_ha_event(
+        "state_changed",
+        {"entity_id": "sensor.unimportant", "new_state": {"state": "on"}},
+        {},
+    )
+    assert len(calls) == 0
+
+    app._on_ha_event(
+        "state_changed",
+        {"entity_id": "sensor.matts_iphone_ble_area", "new_state": {"state": "Bedroom"}},
+        {},
+    )
+    assert len(calls) == 1
+    assert calls[0]["entity_id"] == "sensor.matts_iphone_ble_area"
+    assert calls[0]["state"] == "Bedroom"
+    assert calls[0]["attributes"]["important_observation"] is True

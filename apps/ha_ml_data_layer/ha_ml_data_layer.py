@@ -4,10 +4,21 @@ from __future__ import annotations
 
 from datetime import timedelta
 from pathlib import Path
+from typing import Any
 
 import appdaemon.plugins.hass.hassapi as hass
 
 from .appdaemon_ml.app import AppDaemonMLDataLayer as CoreDataLayer
+
+DEFAULT_IMPORTANT_OBSERVATIONS: dict[str, set[str]] = {
+    "binary_sensor.bedtime": {"on"},
+    "sensor.matts_iphone_ble_area": {"Bedroom", "Living Room"},
+    "device_tracker.mattiphone": {"home"},
+    "binary_sensor.door_sensor_group": {"off"},
+    "input_boolean.thermostat_motion_toggle": {"off"},
+    "input_boolean.almost_bedtime": {"on"},
+    "binary_sensor.apollo_msr_2_173d50_radar_target": {"on"},
+}
 
 
 class AppDaemonMLDataLayer(hass.Hass):
@@ -25,6 +36,7 @@ class AppDaemonMLDataLayer(hass.Hass):
             "sleep_end_entity", "input_datetime.sleep_end"
         )
         self._feature_window_hours = int(self.args.get("feature_window_hours", 24))
+        self._important_observations = DEFAULT_IMPORTANT_OBSERVATIONS
 
         timezone_name = self._timezone_name
         self._core = CoreDataLayer(db_path=db_path, timezone_name=timezone_name)
@@ -37,10 +49,28 @@ class AppDaemonMLDataLayer(hass.Hass):
         entity_id = data.get("entity_id")
         new_state = data.get("new_state")
         state = new_state.get("state") if isinstance(new_state, dict) else None
+        if not entity_id or state is None:
+            return
+
+        allowed_states = self._important_observations.get(entity_id)
+        if not allowed_states:
+            return
+
+        state_str = str(state)
+        is_match = state_str in allowed_states
+        if not is_match:
+            return
+
+        attributes: dict[str, Any] = {
+            "important_observation": True,
+            "entity_id": entity_id,
+            "state": state_str,
+        }
         self._core.handle_event(
             event_type=event_name,
             entity_id=entity_id,
-            state=state,
+            state=state_str,
+            attributes=attributes,
         )
 
     def _run_nightly_pipeline(self, kwargs: dict) -> None:

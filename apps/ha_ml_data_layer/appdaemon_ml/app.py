@@ -64,6 +64,7 @@ class AppDaemonMLDataLayer:
         event_type: str,
         entity_id: str | None = None,
         state: str | None = None,
+        attributes: dict | None = None,
         occurred_at: datetime | None = None,
     ) -> int | None:
         conn = connect(self.db_path)
@@ -73,6 +74,7 @@ class AppDaemonMLDataLayer:
                 event_type=event_type,
                 entity_id=entity_id,
                 state=state,
+                attributes=attributes,
                 occurred_at=occurred_at,
             )
             conn.execute(
