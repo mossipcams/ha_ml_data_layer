@@ -4,12 +4,50 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from collections import defaultdict
 from datetime import UTC, datetime
 
 
 def _utc_now() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat()
+
+
+def _get_logistic_regression_class():
+    from sklearn.linear_model import LogisticRegression
+
+    return LogisticRegression
+
+
+def _build_training_matrix(rows: list[sqlite3.Row]) -> tuple[list[str], list[list[float]], list[int], set[str]]:
+    by_label: dict[int, dict] = {}
+    feature_names: set[str] = set()
+    day_values: set[str] = set()
+
+    for row in rows:
+        label_id = int(row["label_id"])
+        feature_name = str(row["feature_name"])
+        feature_value = float(row["feature_value"])
+        target = int(row["target"])
+        local_date = str(row["local_date"])
+        feature_names.add(feature_name)
+        day_values.add(local_date)
+        if label_id not in by_label:
+            by_label[label_id] = {
+                "target": target,
+                "local_date": local_date,
+                "features": {},
+            }
+        by_label[label_id]["features"][feature_name] = feature_value
+
+    ordered_feature_names = sorted(feature_names)
+    ordered_samples = [by_label[key] for key in sorted(by_label)]
+
+    x: list[list[float]] = []
+    y: list[int] = []
+    for sample in ordered_samples:
+        x.append([float(sample["features"].get(name, 0.0)) for name in ordered_feature_names])
+        y.append(int(sample["target"]))
+
+    return ordered_feature_names, x, y, day_values
 
 
 def run_clr_training_job(
@@ -30,12 +68,13 @@ def run_clr_training_job(
 
     rows = conn.execute(
         """
-        SELECT feature_name, feature_value, target, local_date
+        SELECT label_id, feature_name, feature_value, target, local_date
         FROM vw_clr_training_dataset
         """
     ).fetchall()
-    row_count = len(rows)
-    day_count = len({row["local_date"] for row in rows})
+    feature_names, x, y, day_values = _build_training_matrix(list(rows))
+    row_count = len(x)
+    day_count = len(day_values)
 
     if row_count < min_labeled_rows or day_count < min_labeled_days:
         conn.execute(
@@ -49,28 +88,56 @@ def run_clr_training_job(
         conn.commit()
         return None
 
-    positive = defaultdict(list)
-    negative = defaultdict(list)
-    for row in rows:
-        if row["target"] == 1:
-            positive[row["feature_name"]].append(float(row["feature_value"]))
-        else:
-            negative[row["feature_name"]].append(float(row["feature_value"]))
+    if len(set(y)) < 2:
+        conn.execute(
+            """
+            UPDATE clr_training_runs
+            SET finished_at_utc = ?, status = ?, row_count = ?, day_count = ?, notes = ?
+            WHERE id = ?
+            """,
+            (_utc_now(), "skipped", row_count, day_count, "need both classes", run_id),
+        )
+        conn.commit()
+        return None
 
-    weights: dict[str, float] = {}
-    for name in set(positive) | set(negative):
-        pos_mean = sum(positive[name]) / len(positive[name]) if positive[name] else 0.0
-        neg_mean = sum(negative[name]) / len(negative[name]) if negative[name] else 0.0
-        weights[name] = pos_mean - neg_mean
+    try:
+        logistic_regression_cls = _get_logistic_regression_class()
+    except Exception as exc:  # pragma: no cover - dependency/runtime guard
+        conn.execute(
+            """
+            UPDATE clr_training_runs
+            SET finished_at_utc = ?, status = ?, row_count = ?, day_count = ?, notes = ?
+            WHERE id = ?
+            """,
+            (_utc_now(), "failed", row_count, day_count, f"missing sklearn: {exc}", run_id),
+        )
+        conn.commit()
+        return None
 
-    artifact_json = json.dumps({"weights": weights}, sort_keys=True)
+    model = logistic_regression_cls(max_iter=1000, class_weight="balanced")
+    model.fit(x, y)
+    coefficients = [float(value) for value in model.coef_[0]]
+    intercept = float(model.intercept_[0])
+    classes = [int(value) for value in model.classes_]
+    artifact_json = json.dumps(
+        {
+            "model": {
+                "type": "logistic_regression",
+                "coefficients": coefficients,
+                "intercept": intercept,
+                "classes": classes,
+            },
+            "feature_names": feature_names,
+        },
+        sort_keys=True,
+    )
     conn.execute(
         """
         INSERT INTO clr_model_artifacts(
             run_id, created_at_utc, model_type, feature_set_version, artifact_json
         ) VALUES (?, ?, ?, ?, ?)
         """,
-        (run_id, _utc_now(), "logistic_regression_like", "v1", artifact_json),
+        (run_id, _utc_now(), "sklearn_logistic_regression", "v1", artifact_json),
     )
     conn.execute(
         """

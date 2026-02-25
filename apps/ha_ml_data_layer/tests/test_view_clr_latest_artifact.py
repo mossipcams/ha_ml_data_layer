@@ -31,7 +31,7 @@ def test_clr_contract_views_have_expected_shape(tmp_path: Path) -> None:
         conn.execute(
             """
             INSERT INTO clr_model_artifacts(run_id, created_at_utc, model_type, feature_set_version, artifact_json)
-            VALUES (1,'2026-02-26T06:01:00+00:00','logistic_regression_like','v1','{\"weights\":{}}')
+            VALUES (1,'2026-02-26T06:01:00+00:00','sklearn_logistic_regression','v1','{\"model\":{\"coefficients\":[0.25],\"intercept\":0.1},\"feature_names\":[\"event_count\"]}')
             """
         )
         conn.commit()
@@ -45,7 +45,7 @@ def test_clr_contract_views_have_expected_shape(tmp_path: Path) -> None:
         latest = conn.execute(
             "SELECT model_type, feature_set_version FROM vw_clr_latest_model_artifact"
         ).fetchone()
-        assert latest["model_type"] == "logistic_regression_like"
+        assert latest["model_type"] == "sklearn_logistic_regression"
         assert latest["feature_set_version"] == "v1"
     finally:
         conn.close()
