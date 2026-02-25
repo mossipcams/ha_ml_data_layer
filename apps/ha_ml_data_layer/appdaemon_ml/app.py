@@ -9,7 +9,7 @@ from pathlib import Path
 
 from .bocpd_train import run_bocpd_state_job
 from .clr_train import run_clr_training_job
-from .db import connect, ensure_schema
+from .db import connect, ensure_schema, run_retention_maintenance
 from .features import compute_window_features
 from .ingest import record_raw_event
 from .labels import capture_label_from_helpers
@@ -38,6 +38,9 @@ def get_diagnostics(conn: sqlite3.Connection) -> dict[str, object]:
     degraded = (clr_status and clr_status[0] == "failed") or (
         bocpd_status and bocpd_status[0] == "failed"
     )
+    retention = conn.execute(
+        "SELECT value FROM metadata WHERE key = 'last_retention_at'"
+    ).fetchone()
 
     return {
         "timestamp_utc": datetime.now(UTC).replace(microsecond=0).isoformat(),
@@ -47,6 +50,7 @@ def get_diagnostics(conn: sqlite3.Connection) -> dict[str, object]:
         "clr_last_status": clr_status[0] if clr_status else None,
         "bocpd_last_status": bocpd_status[0] if bocpd_status else None,
         "degraded": bool(degraded),
+        "last_retention_at": retention[0] if retention else None,
     }
 
 
@@ -119,5 +123,21 @@ class AppDaemonMLDataLayer:
             )
             run_clr_training_job(conn, min_labeled_rows=1, min_labeled_days=1)
             run_bocpd_state_job(conn)
+        finally:
+            conn.close()
+
+    def run_retention(
+        self,
+        *,
+        raw_days: int = 30,
+        feature_days: int = 90,
+    ) -> None:
+        conn = connect(self.db_path)
+        try:
+            run_retention_maintenance(
+                conn,
+                raw_days=raw_days,
+                feature_days=feature_days,
+            )
         finally:
             conn.close()

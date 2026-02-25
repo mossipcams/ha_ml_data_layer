@@ -36,6 +36,9 @@ class AppDaemonMLDataLayer(hass.Hass):
             "sleep_end_entity", "input_datetime.sleep_end"
         )
         self._feature_window_hours = int(self.args.get("feature_window_hours", 24))
+        self._retention_time = self.args.get("retention_time", "04:00:00")
+        self._raw_retention_days = int(self.args.get("raw_retention_days", 30))
+        self._feature_retention_days = int(self.args.get("feature_retention_days", 90))
         self._important_observations = DEFAULT_IMPORTANT_OBSERVATIONS
 
         timezone_name = self._timezone_name
@@ -43,6 +46,7 @@ class AppDaemonMLDataLayer(hass.Hass):
         self._core.initialize()
         self.listen_event(self._on_ha_event, self._event_name)
         self.run_daily(self._run_nightly_pipeline, self.parse_time(self._nightly_time))
+        self.run_daily(self._run_retention, self.parse_time(self._retention_time))
         self.log(f"ha_ml_data_layer initialized with db_path={db_path}")
 
     def _on_ha_event(self, event_name: str, data: dict, kwargs: dict) -> None:
@@ -86,6 +90,16 @@ class AppDaemonMLDataLayer(hass.Hass):
             sleep_end=sleep_end,
             window_start=window_start,
             window_end=window_end,
+        )
+
+    def _run_retention(self, kwargs: dict) -> None:
+        self._core.run_retention(
+            raw_days=self._raw_retention_days,
+            feature_days=self._feature_retention_days,
+        )
+        self.log(
+            "ha_ml_data_layer retention completed "
+            f"(raw_days={self._raw_retention_days}, feature_days={self._feature_retention_days})"
         )
 
 
