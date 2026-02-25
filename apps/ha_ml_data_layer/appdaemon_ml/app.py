@@ -7,12 +7,12 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from appdaemon_ml.bocpd_train import run_bocpd_state_job
-from appdaemon_ml.clr_train import run_clr_training_job
-from appdaemon_ml.db import connect, ensure_schema
-from appdaemon_ml.features import compute_window_features
-from appdaemon_ml.ingest import record_raw_event
-from appdaemon_ml.labels import capture_label_from_helpers
+from .bocpd_train import run_bocpd_state_job
+from .clr_train import run_clr_training_job
+from .db import connect, ensure_schema
+from .features import compute_window_features
+from .ingest import record_raw_event
+from .labels import capture_label_from_helpers
 
 
 def get_diagnostics(conn: sqlite3.Connection) -> dict[str, object]:
