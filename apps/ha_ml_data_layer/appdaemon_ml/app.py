@@ -121,6 +121,14 @@ class AppDaemonMLDataLayer:
                 local_date=local_date,
                 timezone_name=self.timezone_name,
             )
+            capture_label_from_helpers(
+                conn,
+                sleep_start=sleep_end,
+                sleep_end=sleep_start,
+                local_date=local_date,
+                timezone_name=self.timezone_name,
+                source="non_sleep",
+            )
             run_lightgbm_training_job(conn, min_labeled_rows=1, min_labeled_days=1)
             run_bocpd_state_job(conn)
         finally:

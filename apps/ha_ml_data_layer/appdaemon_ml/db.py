@@ -117,7 +117,13 @@ def _create_tables(conn: sqlite3.Connection) -> None:
 def _create_views(conn: sqlite3.Connection) -> None:
     conn.executescript(
         """
-        CREATE VIEW IF NOT EXISTS vw_lightgbm_training_dataset AS
+        DROP VIEW IF EXISTS vw_lightgbm_training_dataset;
+        DROP VIEW IF EXISTS vw_lightgbm_latest_model_artifact;
+        DROP VIEW IF EXISTS vw_bocpd_feature_stream;
+        DROP VIEW IF EXISTS vw_bocpd_latest_state;
+        DROP VIEW IF EXISTS vw_latest_feature_snapshot;
+
+        CREATE VIEW vw_lightgbm_training_dataset AS
         SELECT
             l.id AS label_id,
             f.id AS feature_id,
@@ -132,15 +138,16 @@ def _create_views(conn: sqlite3.Connection) -> None:
             END AS target
         FROM features f
         JOIN labels l
-          ON f.window_end_utc <= l.label_end_utc;
+          ON f.window_end_utc <= l.label_end_utc
+         AND f.window_end_utc >= l.label_start_utc;
 
-        CREATE VIEW IF NOT EXISTS vw_lightgbm_latest_model_artifact AS
+        CREATE VIEW vw_lightgbm_latest_model_artifact AS
         SELECT *
         FROM lightgbm_model_artifacts
         ORDER BY created_at_utc DESC, id DESC
         LIMIT 1;
 
-        CREATE VIEW IF NOT EXISTS vw_bocpd_feature_stream AS
+        CREATE VIEW vw_bocpd_feature_stream AS
         SELECT
             id,
             window_end_utc AS ts_utc,
@@ -150,13 +157,13 @@ def _create_views(conn: sqlite3.Connection) -> None:
         FROM features
         ORDER BY window_end_utc ASC, id ASC;
 
-        CREATE VIEW IF NOT EXISTS vw_bocpd_latest_state AS
+        CREATE VIEW vw_bocpd_latest_state AS
         SELECT *
         FROM bocpd_model_state
         ORDER BY created_at_utc DESC, id DESC
         LIMIT 1;
 
-        CREATE VIEW IF NOT EXISTS vw_latest_feature_snapshot AS
+        CREATE VIEW vw_latest_feature_snapshot AS
         SELECT f.*
         FROM features f
         JOIN (
@@ -183,9 +190,9 @@ def _set_metadata(conn: sqlite3.Connection, key: str, value: str) -> None:
     )
 
 
-def ensure_schema(db_path: Path | str, target_version: int = 1) -> None:
-    if target_version != 1:
-        raise ValueError("Only schema version 1 is supported.")
+def ensure_schema(db_path: Path | str, target_version: int = 2) -> None:
+    if target_version != 2:
+        raise ValueError("Only schema version 2 is supported.")
 
     conn = connect(db_path)
     try:
@@ -193,7 +200,7 @@ def ensure_schema(db_path: Path | str, target_version: int = 1) -> None:
         _create_views(conn)
         _set_metadata(conn, "schema_version", str(target_version))
         _set_metadata(conn, "feature_set_version", "v1")
-        _set_metadata(conn, "contract_version", "1")
+        _set_metadata(conn, "contract_version", "2")
         conn.commit()
     finally:
         conn.close()

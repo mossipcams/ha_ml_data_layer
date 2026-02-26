@@ -18,6 +18,7 @@ def get_valid_feature_label_pairs(conn: sqlite3.Connection) -> list[sqlite3.Row]
         FROM features f
         JOIN labels l
           ON f.window_end_utc <= l.label_end_utc
+         AND f.window_end_utc >= l.label_start_utc
         ORDER BY f.window_end_utc ASC, f.id ASC
         """
     ).fetchall()

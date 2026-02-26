@@ -36,7 +36,12 @@ def test_e2e_data_layer_flow(tmp_path: Path) -> None:
     conn = connect(db_path)
     try:
         assert conn.execute("SELECT COUNT(*) FROM features").fetchone()[0] > 0
-        assert conn.execute("SELECT COUNT(*) FROM labels").fetchone()[0] == 1
+        assert conn.execute("SELECT COUNT(*) FROM labels").fetchone()[0] == 2
+        sources = {
+            row[0]
+            for row in conn.execute("SELECT source FROM labels").fetchall()
+        }
+        assert sources == {"sleep_window", "non_sleep"}
         assert conn.execute("SELECT COUNT(*) FROM lightgbm_training_runs").fetchone()[0] >= 1
         assert conn.execute("SELECT COUNT(*) FROM bocpd_training_runs").fetchone()[0] >= 1
     finally:

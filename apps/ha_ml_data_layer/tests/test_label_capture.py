@@ -28,3 +28,25 @@ def test_capture_label_handles_cross_midnight(tmp_path: Path) -> None:
         assert row["timezone"] == "UTC"
     finally:
         conn.close()
+
+
+def test_capture_label_with_custom_source(tmp_path: Path) -> None:
+    db_path = tmp_path / "ha_ml_data_layer.db"
+    ensure_schema(db_path)
+    conn = connect(db_path)
+    try:
+        label_id = capture_label_from_helpers(
+            conn,
+            sleep_start="06:00:00",
+            sleep_end="23:00:00",
+            local_date="2026-02-25",
+            timezone_name="UTC",
+            source="non_sleep",
+        )
+        assert label_id > 0
+        source = conn.execute("SELECT source FROM labels WHERE id = ?", (label_id,)).fetchone()[
+            "source"
+        ]
+        assert source == "non_sleep"
+    finally:
+        conn.close()

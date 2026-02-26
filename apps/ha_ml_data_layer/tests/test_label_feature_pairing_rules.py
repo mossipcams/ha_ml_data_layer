@@ -57,3 +57,38 @@ def test_pairing_rules_exclude_leakage_rows(tmp_path: Path) -> None:
         assert pairs[0]["feature_value"] == 3.0
     finally:
         conn.close()
+
+
+def test_pairing_excludes_features_before_label_start(tmp_path: Path) -> None:
+    db_path = tmp_path / "ha_ml_data_layer.db"
+    ensure_schema(db_path)
+    conn = connect(db_path)
+    try:
+        capture_label_from_helpers(
+            conn,
+            sleep_start="23:00:00",
+            sleep_end="06:00:00",
+            local_date="2026-02-25",
+            timezone_name="UTC",
+        )
+        conn.execute(
+            """
+            INSERT INTO features(
+                window_start_utc, window_end_utc, feature_set_version, feature_name, feature_value, computed_at_utc
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "2026-02-18T20:00:00+00:00",
+                "2026-02-18T21:00:00+00:00",
+                "v1",
+                "event_count",
+                11.0,
+                datetime(2026, 2, 18, 21, 1, tzinfo=UTC).isoformat(),
+            ),
+        )
+        conn.commit()
+
+        pairs = get_valid_feature_label_pairs(conn)
+        assert pairs == []
+    finally:
+        conn.close()

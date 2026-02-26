@@ -21,6 +21,7 @@ def capture_label_from_helpers(
     sleep_end: str,
     local_date: str,
     timezone_name: str,
+    source: str = "sleep_window",
 ) -> int:
     tz = ZoneInfo(timezone_name)
     start_h, start_m, start_s = _parse_time_hms(sleep_start)
@@ -59,7 +60,7 @@ def capture_label_from_helpers(
             end_local.astimezone(UTC).replace(microsecond=0).isoformat(),
             local_date,
             timezone_name,
-            "sleep_window",
+            source,
             now_utc,
         ),
     )

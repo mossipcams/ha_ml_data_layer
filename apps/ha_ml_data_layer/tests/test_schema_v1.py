@@ -20,7 +20,7 @@ def _view_names(conn: sqlite3.Connection) -> set[str]:
 
 def test_ensure_schema_creates_v1_tables_views_and_metadata(tmp_path: Path) -> None:
     db_path = tmp_path / "ha_ml_data_layer.db"
-    ensure_schema(db_path, target_version=1)
+    ensure_schema(db_path)
     conn = sqlite3.connect(db_path)
     try:
         assert conn.execute("PRAGMA journal_mode").fetchone()[0].lower() == "wal"
@@ -51,8 +51,34 @@ def test_ensure_schema_creates_v1_tables_views_and_metadata(tmp_path: Path) -> N
             row[0]: row[1]
             for row in conn.execute("SELECT key, value FROM metadata").fetchall()
         }
-        assert keys["schema_version"] == "1"
+        assert keys["schema_version"] == "2"
         assert keys["feature_set_version"] == "v1"
-        assert keys["contract_version"] == "1"
+        assert keys["contract_version"] == "2"
     finally:
         conn.close()
+
+
+def test_ensure_schema_is_idempotent(tmp_path: Path) -> None:
+    db_path = tmp_path / "ha_ml_data_layer.db"
+    ensure_schema(db_path)
+    ensure_schema(db_path)
+    conn = sqlite3.connect(db_path)
+    try:
+        keys = {
+            row[0]: row[1]
+            for row in conn.execute("SELECT key, value FROM metadata").fetchall()
+        }
+        assert keys["schema_version"] == "2"
+        assert keys["contract_version"] == "2"
+    finally:
+        conn.close()
+
+
+def test_ensure_schema_rejects_v1_target_version(tmp_path: Path) -> None:
+    db_path = tmp_path / "ha_ml_data_layer.db"
+    try:
+        ensure_schema(db_path, target_version=1)
+    except ValueError as exc:
+        assert str(exc) == "Only schema version 2 is supported."
+    else:  # pragma: no cover
+        raise AssertionError("Expected ensure_schema(..., target_version=1) to fail")
