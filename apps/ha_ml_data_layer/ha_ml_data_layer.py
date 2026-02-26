@@ -8,7 +8,7 @@ from typing import Any
 
 import appdaemon.plugins.hass.hassapi as hass
 
-from .appdaemon_ml.app import AppDaemonMLDataLayer as CoreDataLayer
+from appdaemon_ml.app import AppDaemonMLDataLayer as CoreDataLayer
 
 DEFAULT_IMPORTANT_OBSERVATIONS: dict[str, set[str]] = {
     "binary_sensor.bedtime": {"on"},
