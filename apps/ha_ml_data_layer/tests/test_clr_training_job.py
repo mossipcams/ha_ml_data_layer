@@ -3,33 +3,15 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import appdaemon_ml.clr_train as clr_train
-from appdaemon_ml.clr_train import run_clr_training_job
+from appdaemon_ml.lightgbm_train import run_lightgbm_training_job
 from appdaemon_ml.db import connect, ensure_schema
 
 
-def test_clr_training_job_persists_run_and_artifact(tmp_path: Path, monkeypatch) -> None:
+def test_lightgbm_training_job_persists_run_and_artifact(tmp_path: Path) -> None:
     db_path = tmp_path / "ha_ml_data_layer.db"
     ensure_schema(db_path)
     conn = connect(db_path)
     try:
-        class FakeLogisticRegression:
-            def __init__(self, **kwargs):
-                self.kwargs = kwargs
-                self.coef_ = [[0.25]]
-                self.intercept_ = [0.1]
-                self.classes_ = [0, 1]
-
-            def fit(self, x, y):
-                assert len(x) == len(y)
-                return self
-
-        monkeypatch.setattr(
-            clr_train,
-            "_get_logistic_regression_class",
-            lambda: FakeLogisticRegression,
-        )
-
         conn.execute(
             """
             INSERT INTO labels(label_start_utc, label_end_utc, local_date, timezone, source, created_at_utc)
@@ -48,22 +30,25 @@ def test_clr_training_job_persists_run_and_artifact(tmp_path: Path, monkeypatch)
         )
         conn.commit()
 
-        run_id = run_clr_training_job(conn, min_labeled_rows=2, min_labeled_days=2)
+        run_id = run_lightgbm_training_job(conn, min_labeled_rows=2, min_labeled_days=2)
         assert run_id is not None
 
-        run = conn.execute("SELECT status, row_count, day_count FROM clr_training_runs WHERE id = ?", (run_id,)).fetchone()
+        run = conn.execute(
+            "SELECT status, row_count, day_count FROM lightgbm_training_runs WHERE id = ?",
+            (run_id,),
+        ).fetchone()
         assert run["status"] == "completed"
         assert run["row_count"] >= 2
         assert run["day_count"] == 2
 
         artifact = conn.execute(
-            "SELECT model_type, feature_set_version, artifact_json FROM clr_model_artifacts WHERE run_id = ?",
+            "SELECT model_type, feature_set_version, artifact_json FROM lightgbm_model_artifacts WHERE run_id = ?",
             (run_id,),
         ).fetchone()
-        assert artifact["model_type"] == "sklearn_logistic_regression"
+        assert artifact["model_type"] == "lightgbm_like"
         payload = json.loads(artifact["artifact_json"])
-        assert payload["model"]["coefficients"] == [0.25]
-        assert payload["model"]["intercept"] == 0.1
+        assert "weights" in payload["model"]
+        assert "intercept" in payload["model"]
         assert payload["feature_names"] == ["event_count"]
     finally:
         conn.close()

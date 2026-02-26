@@ -19,7 +19,7 @@ def test_diagnostics_report_readiness_and_degraded_state(tmp_path: Path) -> None
         )
         conn.execute(
             """
-            INSERT INTO clr_training_runs(started_at_utc, finished_at_utc, status, row_count, day_count, notes)
+            INSERT INTO lightgbm_training_runs(started_at_utc, finished_at_utc, status, row_count, day_count, notes)
             VALUES ('2026-02-25T01:00:00+00:00','2026-02-25T01:05:00+00:00','failed',0,0,'boom')
             """
         )
@@ -35,7 +35,7 @@ def test_diagnostics_report_readiness_and_degraded_state(tmp_path: Path) -> None
         diag = get_diagnostics(conn)
         assert diag["raw_event_count"] == 1
         assert diag["degraded"] is True
-        assert "clr_last_status" in diag
+        assert "lightgbm_last_status" in diag
         assert diag["last_retention_at"] == "2026-02-25T01:10:00+00:00"
     finally:
         conn.close()

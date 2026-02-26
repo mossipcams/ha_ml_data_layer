@@ -30,8 +30,8 @@ def test_ensure_schema_creates_v1_tables_views_and_metadata(tmp_path: Path) -> N
             "raw_events",
             "features",
             "labels",
-            "clr_training_runs",
-            "clr_model_artifacts",
+            "lightgbm_training_runs",
+            "lightgbm_model_artifacts",
             "bocpd_training_runs",
             "bocpd_model_state",
             "metadata",
@@ -39,8 +39,8 @@ def test_ensure_schema_creates_v1_tables_views_and_metadata(tmp_path: Path) -> N
         assert expected_tables.issubset(_table_names(conn))
 
         expected_views = {
-            "vw_clr_training_dataset",
-            "vw_clr_latest_model_artifact",
+            "vw_lightgbm_training_dataset",
+            "vw_lightgbm_latest_model_artifact",
             "vw_bocpd_feature_stream",
             "vw_bocpd_latest_state",
             "vw_latest_feature_snapshot",

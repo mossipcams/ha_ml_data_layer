@@ -63,7 +63,7 @@ def _create_tables(conn: sqlite3.Connection) -> None:
         );
         CREATE INDEX IF NOT EXISTS idx_labels_end ON labels (label_end_utc);
 
-        CREATE TABLE IF NOT EXISTS clr_training_runs (
+        CREATE TABLE IF NOT EXISTS lightgbm_training_runs (
             id INTEGER PRIMARY KEY,
             started_at_utc TEXT NOT NULL,
             finished_at_utc TEXT,
@@ -73,17 +73,17 @@ def _create_tables(conn: sqlite3.Connection) -> None:
             notes TEXT
         );
 
-        CREATE TABLE IF NOT EXISTS clr_model_artifacts (
+        CREATE TABLE IF NOT EXISTS lightgbm_model_artifacts (
             id INTEGER PRIMARY KEY,
             run_id INTEGER NOT NULL,
             created_at_utc TEXT NOT NULL,
             model_type TEXT NOT NULL,
             feature_set_version TEXT NOT NULL,
             artifact_json TEXT NOT NULL,
-            FOREIGN KEY (run_id) REFERENCES clr_training_runs(id)
+            FOREIGN KEY (run_id) REFERENCES lightgbm_training_runs(id)
         );
-        CREATE INDEX IF NOT EXISTS idx_clr_model_artifacts_created
-            ON clr_model_artifacts (created_at_utc);
+        CREATE INDEX IF NOT EXISTS idx_lightgbm_model_artifacts_created
+            ON lightgbm_model_artifacts (created_at_utc);
 
         CREATE TABLE IF NOT EXISTS bocpd_training_runs (
             id INTEGER PRIMARY KEY,
@@ -117,7 +117,7 @@ def _create_tables(conn: sqlite3.Connection) -> None:
 def _create_views(conn: sqlite3.Connection) -> None:
     conn.executescript(
         """
-        CREATE VIEW IF NOT EXISTS vw_clr_training_dataset AS
+        CREATE VIEW IF NOT EXISTS vw_lightgbm_training_dataset AS
         SELECT
             l.id AS label_id,
             f.id AS feature_id,
@@ -134,9 +134,9 @@ def _create_views(conn: sqlite3.Connection) -> None:
         JOIN labels l
           ON f.window_end_utc <= l.label_end_utc;
 
-        CREATE VIEW IF NOT EXISTS vw_clr_latest_model_artifact AS
+        CREATE VIEW IF NOT EXISTS vw_lightgbm_latest_model_artifact AS
         SELECT *
-        FROM clr_model_artifacts
+        FROM lightgbm_model_artifacts
         ORDER BY created_at_utc DESC, id DESC
         LIMIT 1;
 

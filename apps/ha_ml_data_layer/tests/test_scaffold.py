@@ -12,7 +12,7 @@ def test_appdaemon_ml_package_scaffold_imports() -> None:
         "appdaemon_ml.ingest",
         "appdaemon_ml.features",
         "appdaemon_ml.labels",
-        "appdaemon_ml.clr_train",
+        "appdaemon_ml.lightgbm_train",
         "appdaemon_ml.bocpd_train",
         "appdaemon_ml.contracts",
     ]

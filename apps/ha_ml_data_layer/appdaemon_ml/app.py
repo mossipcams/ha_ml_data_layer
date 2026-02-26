@@ -8,21 +8,21 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from .bocpd_train import run_bocpd_state_job
-from .clr_train import run_clr_training_job
 from .db import connect, ensure_schema, run_retention_maintenance
 from .features import compute_window_features
 from .ingest import record_raw_event
 from .labels import capture_label_from_helpers
+from .lightgbm_train import run_lightgbm_training_job
 
 
 def get_diagnostics(conn: sqlite3.Connection) -> dict[str, object]:
     raw_event_count = conn.execute("SELECT COUNT(*) FROM raw_events").fetchone()[0]
     feature_count = conn.execute("SELECT COUNT(*) FROM features").fetchone()[0]
     label_count = conn.execute("SELECT COUNT(*) FROM labels").fetchone()[0]
-    clr_status = conn.execute(
+    lightgbm_status = conn.execute(
         """
         SELECT status
-        FROM clr_training_runs
+        FROM lightgbm_training_runs
         ORDER BY id DESC
         LIMIT 1
         """
@@ -35,7 +35,7 @@ def get_diagnostics(conn: sqlite3.Connection) -> dict[str, object]:
         LIMIT 1
         """
     ).fetchone()
-    degraded = (clr_status and clr_status[0] == "failed") or (
+    degraded = (lightgbm_status and lightgbm_status[0] == "failed") or (
         bocpd_status and bocpd_status[0] == "failed"
     )
     retention = conn.execute(
@@ -47,7 +47,7 @@ def get_diagnostics(conn: sqlite3.Connection) -> dict[str, object]:
         "raw_event_count": raw_event_count,
         "feature_count": feature_count,
         "label_count": label_count,
-        "clr_last_status": clr_status[0] if clr_status else None,
+        "lightgbm_last_status": lightgbm_status[0] if lightgbm_status else None,
         "bocpd_last_status": bocpd_status[0] if bocpd_status else None,
         "degraded": bool(degraded),
         "last_retention_at": retention[0] if retention else None,
@@ -121,7 +121,7 @@ class AppDaemonMLDataLayer:
                 local_date=local_date,
                 timezone_name=self.timezone_name,
             )
-            run_clr_training_job(conn, min_labeled_rows=1, min_labeled_days=1)
+            run_lightgbm_training_job(conn, min_labeled_rows=1, min_labeled_days=1)
             run_bocpd_state_job(conn)
         finally:
             conn.close()

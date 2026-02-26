@@ -5,7 +5,7 @@ from pathlib import Path
 from appdaemon_ml.db import connect, ensure_schema
 
 
-def test_clr_contract_views_have_expected_shape(tmp_path: Path) -> None:
+def test_lightgbm_contract_views_have_expected_shape(tmp_path: Path) -> None:
     db_path = tmp_path / "ha_ml_data_layer.db"
     ensure_schema(db_path)
     conn = connect(db_path)
@@ -24,28 +24,28 @@ def test_clr_contract_views_have_expected_shape(tmp_path: Path) -> None:
         )
         conn.execute(
             """
-            INSERT INTO clr_training_runs(started_at_utc, finished_at_utc, status, row_count, day_count, notes)
+            INSERT INTO lightgbm_training_runs(started_at_utc, finished_at_utc, status, row_count, day_count, notes)
             VALUES ('2026-02-26T06:00:00+00:00','2026-02-26T06:01:00+00:00','completed',1,1,'ok')
             """
         )
         conn.execute(
             """
-            INSERT INTO clr_model_artifacts(run_id, created_at_utc, model_type, feature_set_version, artifact_json)
-            VALUES (1,'2026-02-26T06:01:00+00:00','sklearn_logistic_regression','v1','{\"model\":{\"coefficients\":[0.25],\"intercept\":0.1},\"feature_names\":[\"event_count\"]}')
+            INSERT INTO lightgbm_model_artifacts(run_id, created_at_utc, model_type, feature_set_version, artifact_json)
+            VALUES (1,'2026-02-26T06:01:00+00:00','lightgbm_like','v1','{\"model\":{\"weights\":[0.25],\"intercept\":0.1},\"feature_names\":[\"event_count\"]}')
             """
         )
         conn.commit()
 
-        clr_row = conn.execute(
-            "SELECT feature_name, feature_value, target FROM vw_clr_training_dataset"
+        lightgbm_row = conn.execute(
+            "SELECT feature_name, feature_value, target FROM vw_lightgbm_training_dataset"
         ).fetchone()
-        assert clr_row["feature_name"] == "event_count"
-        assert clr_row["target"] == 1
+        assert lightgbm_row["feature_name"] == "event_count"
+        assert lightgbm_row["target"] == 1
 
         latest = conn.execute(
-            "SELECT model_type, feature_set_version FROM vw_clr_latest_model_artifact"
+            "SELECT model_type, feature_set_version FROM vw_lightgbm_latest_model_artifact"
         ).fetchone()
-        assert latest["model_type"] == "sklearn_logistic_regression"
+        assert latest["model_type"] == "lightgbm_like"
         assert latest["feature_set_version"] == "v1"
     finally:
         conn.close()
