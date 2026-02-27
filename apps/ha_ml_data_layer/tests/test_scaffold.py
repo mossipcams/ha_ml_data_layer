@@ -38,11 +38,16 @@ def test_module_path_examples_match_repo_layout() -> None:
     tests_dir = Path(__file__).resolve().parent
     repo_root = tests_dir.parents[2]
 
-    expected = "module: ha_ml_data_layer.ha_ml_data_layer"
-    for rel_path in (
-        Path("README.md"),
-        Path("apps/ha_ml_data_layer/apps.yaml"),
-        Path("apps/ha_ml_data_layer/apps.example.yaml"),
-    ):
-        content = (repo_root / rel_path).read_text(encoding="utf-8")
-        assert expected in content
+    app_yaml = repo_root / "apps/ha_ml_data_layer/apps.yaml"
+    content = app_yaml.read_text(encoding="utf-8")
+    assert "module: ha_ml_data_layer" in content
+    assert (
+        "db_path: /addon_configs/a0d7b954_appdaemon/appdaemon/ha_ml_data_layer.db"
+        in content
+    )
+    assert 'nightly_time: "03:00:00"' in content
+    assert 'retention_time: "04:00:00"' in content
+    assert "raw_retention_days: 30" in content
+    assert "feature_retention_days: 90" in content
+    assert "timezone_name: UTC" in content
+    assert not (repo_root / "apps/ha_ml_data_layer/apps.example.yaml").exists()
