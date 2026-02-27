@@ -46,6 +46,10 @@ class AppDaemonMLDataLayer(hass.Hass):
         timezone_name = self._timezone_name
         self._core = CoreDataLayer(db_path=db_path, timezone_name=timezone_name)
         self._core.initialize()
+        try:
+            self._run_nightly_pipeline({})
+        except Exception as exc:
+            self.log(f"ha_ml_data_layer startup catch-up pipeline failed: {exc}")
         self._core.run_startup_retrain()
         self.listen_event(self._on_ha_event, self._event_name)
         self.run_daily(self._run_nightly_pipeline, self.parse_time(self._nightly_time))

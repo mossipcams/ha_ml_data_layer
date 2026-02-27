@@ -132,6 +132,9 @@ def test_initialize_triggers_startup_retrain() -> None:
         def initialize(self) -> None:
             calls.append("initialize")
 
+        def run_nightly_pipeline(self, **kwargs) -> None:
+            calls.append("run_nightly_pipeline")
+
         def run_startup_retrain(self) -> None:
             calls.append("run_startup_retrain")
 
@@ -148,8 +151,10 @@ def test_initialize_triggers_startup_retrain() -> None:
     app.listen_event = lambda callback, event_name: None
     app.run_daily = lambda callback, schedule_time: None
     app.parse_time = lambda value: value
+    app.datetime = lambda: datetime(2026, 2, 27, 3, 0, 0)
+    app.get_state = lambda entity: "23:00:00" if "start" in entity else "07:00:00"
     app.log = lambda _: None
 
     app.initialize()
 
-    assert calls == ["initialize", "run_startup_retrain"]
+    assert calls == ["initialize", "run_nightly_pipeline", "run_startup_retrain"]
