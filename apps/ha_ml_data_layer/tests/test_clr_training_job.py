@@ -52,3 +52,41 @@ def test_lightgbm_training_job_persists_run_and_artifact(tmp_path: Path) -> None
         assert payload["feature_names"] == ["event_count"]
     finally:
         conn.close()
+
+
+def test_lightgbm_training_job_skips_when_only_one_target_class(tmp_path: Path) -> None:
+    db_path = tmp_path / "ha_ml_data_layer.db"
+    ensure_schema(db_path)
+    conn = connect(db_path)
+    try:
+        conn.execute(
+            """
+            INSERT INTO labels(label_start_utc, label_end_utc, local_date, timezone, source, created_at_utc)
+            VALUES ('2026-02-25T23:00:00+00:00', '2026-02-26T06:00:00+00:00', '2026-02-25', 'UTC', 'sleep_window', '2026-02-26T06:01:00+00:00')
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO features(window_start_utc, window_end_utc, feature_set_version, feature_name, feature_value, computed_at_utc)
+            VALUES
+            ('2026-02-25T22:00:00+00:00', '2026-02-26T05:30:00+00:00', 'v1', 'event_count', 10, '2026-02-26T05:31:00+00:00'),
+            ('2026-02-25T22:00:00+00:00', '2026-02-26T05:30:00+00:00', 'v1', 'on_ratio', 0.8, '2026-02-26T05:31:00+00:00')
+            """
+        )
+        conn.commit()
+
+        run_id = run_lightgbm_training_job(conn, min_labeled_rows=1, min_labeled_days=1)
+        assert run_id is None
+
+        run = conn.execute(
+            """
+            SELECT status, notes
+            FROM lightgbm_training_runs
+            ORDER BY id DESC
+            LIMIT 1
+            """
+        ).fetchone()
+        assert run["status"] == "skipped"
+        assert "class" in str(run["notes"]).casefold()
+    finally:
+        conn.close()

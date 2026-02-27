@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import sys
 import types
+from datetime import datetime
 
 
 def _install_fake_appdaemon_hass() -> None:
@@ -91,3 +92,27 @@ def test_retention_callback_uses_configured_days() -> None:
     app._run_retention({})
 
     assert calls == [(10, 45)]
+
+
+def test_nightly_pipeline_uses_previous_local_date_before_sleep_end() -> None:
+    _install_fake_appdaemon_hass()
+    module = importlib.import_module("ha_ml_data_layer")
+    app = module.AppDaemonMLDataLayer.__new__(module.AppDaemonMLDataLayer)
+
+    calls: list[dict] = []
+
+    class FakeCore:
+        def run_nightly_pipeline(self, **kwargs):
+            calls.append(kwargs)
+
+    app._core = FakeCore()
+    app._feature_window_hours = 24
+    app._sleep_start_entity = "input_datetime.sleep_start"
+    app._sleep_end_entity = "input_datetime.sleep_end"
+    app.get_state = lambda entity: "23:00:00" if "start" in entity else "07:00:00"
+    app.datetime = lambda: datetime(2026, 2, 27, 3, 0, 0)
+
+    app._run_nightly_pipeline({})
+
+    assert len(calls) == 1
+    assert calls[0]["local_date"] == "2026-02-26"

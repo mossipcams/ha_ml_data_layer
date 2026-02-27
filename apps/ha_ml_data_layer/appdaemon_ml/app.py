@@ -6,6 +6,7 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from .bocpd_train import run_bocpd_state_job
 from .db import connect, ensure_schema, run_retention_maintenance
@@ -138,6 +139,26 @@ class AppDaemonMLDataLayer:
                 window_end=window_end,
                 feature_set_version="v1",
             )
+            # Add a second training sample ending at local sleep_start so each run can
+            # contribute a non-sleep-aligned feature row in addition to the sleep-aligned row.
+            window_duration = window_end - window_start
+            local_day = datetime.fromisoformat(local_date)
+            timezone = ZoneInfo(self.timezone_name)
+            sleep_start_h, sleep_start_m, sleep_start_s = [int(part) for part in sleep_start.split(":")]
+            non_sleep_end_local = local_day.replace(
+                hour=sleep_start_h,
+                minute=sleep_start_m,
+                second=sleep_start_s,
+                tzinfo=timezone,
+            )
+            non_sleep_end = non_sleep_end_local.astimezone(UTC).replace(microsecond=0)
+            if non_sleep_end != window_end:
+                compute_window_features(
+                    conn,
+                    window_start=non_sleep_end - window_duration,
+                    window_end=non_sleep_end,
+                    feature_set_version="v1",
+                )
             capture_label_from_helpers(
                 conn,
                 sleep_start=sleep_start,

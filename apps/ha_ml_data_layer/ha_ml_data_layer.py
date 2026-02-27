@@ -2,13 +2,26 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import time, timedelta
 from pathlib import Path
 from typing import Any
 
 import appdaemon.plugins.hass.hassapi as hass
 
 from appdaemon_ml.app import AppDaemonMLDataLayer as CoreDataLayer
+
+
+def _parse_hms(value: str, fallback: time) -> time:
+    parts = str(value).split(":")
+    if len(parts) != 3:
+        return fallback
+    try:
+        hour = int(parts[0])
+        minute = int(parts[1])
+        second = int(parts[2])
+        return time(hour=hour, minute=minute, second=second)
+    except (TypeError, ValueError):
+        return fallback
 
 
 class AppDaemonMLDataLayer(hass.Hass):
@@ -64,7 +77,11 @@ class AppDaemonMLDataLayer(hass.Hass):
         window_start = now_local - timedelta(hours=self._feature_window_hours)
         sleep_start = str(self.get_state(self._sleep_start_entity) or "23:00:00")
         sleep_end = str(self.get_state(self._sleep_end_entity) or "07:00:00")
-        local_date = now_local.date().isoformat()
+        sleep_end_time = _parse_hms(sleep_end, fallback=time(hour=7, minute=0, second=0))
+        local_date_dt = now_local.date()
+        if now_local.time() < sleep_end_time:
+            local_date_dt = local_date_dt - timedelta(days=1)
+        local_date = local_date_dt.isoformat()
         self._core.run_nightly_pipeline(
             local_date=local_date,
             sleep_start=sleep_start,
