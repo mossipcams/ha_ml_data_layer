@@ -42,7 +42,7 @@ def test_module_path_examples_match_repo_layout() -> None:
     content = app_yaml.read_text(encoding="utf-8")
     assert "module: ha_ml_data_layer" in content
     assert (
-        "db_path: /addon_configs/a0d7b954_appdaemon/appdaemon/ha_ml_data_layer.db"
+        "db_path: /homeassistant/appdaemon/ha_ml_data_layer.db"
         in content
     )
     assert 'nightly_time: "03:00:00"' in content

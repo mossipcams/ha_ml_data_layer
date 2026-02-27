@@ -16,7 +16,7 @@ Example `apps.yaml` entry:
 ha_ml_data_layer:
   module: ha_ml_data_layer
   class: AppDaemonMLDataLayer
-  db_path: /addon_configs/a0d7b954_appdaemon/appdaemon/ha_ml_data_layer.db
+  db_path: /homeassistant/appdaemon/ha_ml_data_layer.db
   nightly_time: "03:00:00"
   retention_time: "04:00:00"
   raw_retention_days: 30

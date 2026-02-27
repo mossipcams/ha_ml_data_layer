@@ -25,7 +25,7 @@ class AppDaemonMLDataLayer(hass.Hass):
     """AppDaemon-compatible wrapper around the core data-layer class."""
 
     def initialize(self) -> None:
-        db_path = Path(self.args.get("db_path", "/config/appdaemon/ha_ml_data_layer.db"))
+        db_path = Path(self.args.get("db_path", "/homeassistant/appdaemon/ha_ml_data_layer.db"))
         self._timezone_name = self.args.get("timezone_name", "UTC")
         self._event_name = self.args.get("event_name", "state_changed")
         self._nightly_time = self.args.get("nightly_time", "03:00:00")
