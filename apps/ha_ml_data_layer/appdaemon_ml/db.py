@@ -164,15 +164,27 @@ def _create_views(conn: sqlite3.Connection) -> None:
         LIMIT 1;
 
         CREATE VIEW vw_latest_feature_snapshot AS
-        SELECT f.*
-        FROM features f
-        JOIN (
-          SELECT feature_name, MAX(window_end_utc) AS max_end
-          FROM features
-          GROUP BY feature_name
-        ) latest
-          ON latest.feature_name = f.feature_name
-         AND latest.max_end = f.window_end_utc;
+        SELECT
+            ranked.id,
+            ranked.window_start_utc,
+            ranked.window_end_utc,
+            ranked.feature_set_version,
+            ranked.feature_name,
+            ranked.feature_value,
+            ranked.computed_at_utc
+        FROM (
+            SELECT
+                f.*,
+                ROW_NUMBER() OVER (
+                    PARTITION BY f.feature_name
+                    ORDER BY
+                        f.window_end_utc DESC,
+                        f.computed_at_utc DESC,
+                        f.id DESC
+                ) AS row_num
+            FROM features f
+        ) ranked
+        WHERE ranked.row_num = 1;
         """
     )
 
