@@ -32,6 +32,20 @@ def test_diagnostics_report_readiness_and_degraded_state(tmp_path: Path) -> None
         )
         conn.execute(
             """
+            INSERT INTO metadata(key, value, updated_at_utc)
+            VALUES ('last_startup_retrain_at', '2026-02-25T01:11:00+00:00', '2026-02-25T01:11:00+00:00')
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at_utc = excluded.updated_at_utc
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO metadata(key, value, updated_at_utc)
+            VALUES ('last_startup_retrain_status', 'completed', '2026-02-25T01:11:00+00:00')
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at_utc = excluded.updated_at_utc
+            """
+        )
+        conn.execute(
+            """
             INSERT INTO ingestion_rules(entity_id, state, source, updated_at_utc)
             VALUES ('sensor.a', 'on', 'mindml:test', '2026-02-25T01:10:00+00:00')
             """
@@ -44,5 +58,7 @@ def test_diagnostics_report_readiness_and_degraded_state(tmp_path: Path) -> None
         assert diag["ingestion_rules_count"] == 1
         assert "lightgbm_last_status" in diag
         assert diag["last_retention_at"] == "2026-02-25T01:10:00+00:00"
+        assert diag["last_startup_retrain_at"] == "2026-02-25T01:11:00+00:00"
+        assert diag["last_startup_retrain_status"] == "completed"
     finally:
         conn.close()

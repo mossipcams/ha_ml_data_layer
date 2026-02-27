@@ -116,3 +116,40 @@ def test_nightly_pipeline_uses_previous_local_date_before_sleep_end() -> None:
 
     assert len(calls) == 1
     assert calls[0]["local_date"] == "2026-02-26"
+
+
+def test_initialize_triggers_startup_retrain() -> None:
+    _install_fake_appdaemon_hass()
+    module = importlib.import_module("ha_ml_data_layer")
+
+    calls: list[str] = []
+
+    class FakeCore:
+        def __init__(self, *, db_path, timezone_name):
+            self.db_path = db_path
+            self.timezone_name = timezone_name
+
+        def initialize(self) -> None:
+            calls.append("initialize")
+
+        def run_startup_retrain(self) -> None:
+            calls.append("run_startup_retrain")
+
+    module.CoreDataLayer = FakeCore
+
+    app = module.AppDaemonMLDataLayer.__new__(module.AppDaemonMLDataLayer)
+    app.args = {
+        "db_path": "/tmp/ha_ml_data_layer.db",
+        "timezone_name": "UTC",
+        "event_name": "state_changed",
+        "nightly_time": "03:30:00",
+        "retention_time": "04:00:00",
+    }
+    app.listen_event = lambda callback, event_name: None
+    app.run_daily = lambda callback, schedule_time: None
+    app.parse_time = lambda value: value
+    app.log = lambda _: None
+
+    app.initialize()
+
+    assert calls == ["initialize", "run_startup_retrain"]

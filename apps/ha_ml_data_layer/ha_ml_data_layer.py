@@ -46,6 +46,7 @@ class AppDaemonMLDataLayer(hass.Hass):
         timezone_name = self._timezone_name
         self._core = CoreDataLayer(db_path=db_path, timezone_name=timezone_name)
         self._core.initialize()
+        self._core.run_startup_retrain()
         self.listen_event(self._on_ha_event, self._event_name)
         self.run_daily(self._run_nightly_pipeline, self.parse_time(self._nightly_time))
         self.run_daily(self._run_retention, self.parse_time(self._retention_time))

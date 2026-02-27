@@ -45,6 +45,12 @@ def get_diagnostics(conn: sqlite3.Connection) -> dict[str, object]:
     retention = conn.execute(
         "SELECT value FROM metadata WHERE key = 'last_retention_at'"
     ).fetchone()
+    startup_retrain_at = conn.execute(
+        "SELECT value FROM metadata WHERE key = 'last_startup_retrain_at'"
+    ).fetchone()
+    startup_retrain_status = conn.execute(
+        "SELECT value FROM metadata WHERE key = 'last_startup_retrain_status'"
+    ).fetchone()
 
     return {
         "timestamp_utc": datetime.now(UTC).replace(microsecond=0).isoformat(),
@@ -56,6 +62,10 @@ def get_diagnostics(conn: sqlite3.Connection) -> dict[str, object]:
         "bocpd_last_status": bocpd_status[0] if bocpd_status else None,
         "degraded": bool(degraded),
         "last_retention_at": retention[0] if retention else None,
+        "last_startup_retrain_at": startup_retrain_at[0] if startup_retrain_at else None,
+        "last_startup_retrain_status": (
+            startup_retrain_status[0] if startup_retrain_status else None
+        ),
     }
 
 
@@ -66,6 +76,70 @@ class AppDaemonMLDataLayer:
 
     def initialize(self) -> None:
         ensure_schema(self.db_path)
+
+    def run_startup_retrain(
+        self,
+        *,
+        min_labeled_rows: int = 1,
+        min_labeled_days: int = 1,
+    ) -> int | None:
+        conn = connect(self.db_path)
+        try:
+            run_id = run_lightgbm_training_job(
+                conn,
+                min_labeled_rows=min_labeled_rows,
+                min_labeled_days=min_labeled_days,
+            )
+            latest = conn.execute(
+                """
+                SELECT status
+                FROM lightgbm_training_runs
+                ORDER BY id DESC
+                LIMIT 1
+                """
+            ).fetchone()
+            status = str(latest["status"]) if latest else ("completed" if run_id is not None else "skipped")
+            now_utc = datetime.now(UTC).replace(microsecond=0).isoformat()
+            conn.execute(
+                """
+                INSERT INTO metadata(key, value, updated_at_utc)
+                VALUES ('last_startup_retrain_at', ?, ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at_utc = excluded.updated_at_utc
+                """,
+                (now_utc, now_utc),
+            )
+            conn.execute(
+                """
+                INSERT INTO metadata(key, value, updated_at_utc)
+                VALUES ('last_startup_retrain_status', ?, ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at_utc = excluded.updated_at_utc
+                """,
+                (status, now_utc),
+            )
+            conn.commit()
+            return run_id
+        except Exception:
+            now_utc = datetime.now(UTC).replace(microsecond=0).isoformat()
+            conn.execute(
+                """
+                INSERT INTO metadata(key, value, updated_at_utc)
+                VALUES ('last_startup_retrain_at', ?, ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at_utc = excluded.updated_at_utc
+                """,
+                (now_utc, now_utc),
+            )
+            conn.execute(
+                """
+                INSERT INTO metadata(key, value, updated_at_utc)
+                VALUES ('last_startup_retrain_status', ?, ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at_utc = excluded.updated_at_utc
+                """,
+                ("failed", now_utc),
+            )
+            conn.commit()
+            raise
+        finally:
+            conn.close()
 
     def handle_event(
         self,
