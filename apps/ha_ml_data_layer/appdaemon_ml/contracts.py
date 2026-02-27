@@ -6,6 +6,7 @@ import sqlite3
 
 REQUIRED_PULL_VIEWS = [
     "vw_lightgbm_latest_model_artifact",
+    "vw_lightgbm_latest_training_result",
     "vw_latest_feature_snapshot",
     "vw_bocpd_latest_state",
 ]

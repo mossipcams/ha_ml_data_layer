@@ -38,6 +38,17 @@ def _create_tables(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_raw_events_occurred_at
             ON raw_events (occurred_at_utc);
 
+        CREATE TABLE IF NOT EXISTS ingestion_rules (
+            id INTEGER PRIMARY KEY,
+            entity_id TEXT NOT NULL,
+            state TEXT NOT NULL,
+            source TEXT NOT NULL,
+            updated_at_utc TEXT NOT NULL,
+            UNIQUE(entity_id, state, source)
+        );
+        CREATE INDEX IF NOT EXISTS idx_ingestion_rules_entity_state
+            ON ingestion_rules (entity_id, state);
+
         CREATE TABLE IF NOT EXISTS features (
             id INTEGER PRIMARY KEY,
             window_start_utc TEXT NOT NULL,
@@ -119,6 +130,7 @@ def _create_views(conn: sqlite3.Connection) -> None:
         """
         DROP VIEW IF EXISTS vw_lightgbm_training_dataset;
         DROP VIEW IF EXISTS vw_lightgbm_latest_model_artifact;
+        DROP VIEW IF EXISTS vw_lightgbm_latest_training_result;
         DROP VIEW IF EXISTS vw_bocpd_feature_stream;
         DROP VIEW IF EXISTS vw_bocpd_latest_state;
         DROP VIEW IF EXISTS vw_latest_feature_snapshot;
@@ -145,6 +157,24 @@ def _create_views(conn: sqlite3.Connection) -> None:
         SELECT *
         FROM lightgbm_model_artifacts
         ORDER BY created_at_utc DESC, id DESC
+        LIMIT 1;
+
+        CREATE VIEW vw_lightgbm_latest_training_result AS
+        SELECT
+            r.id AS run_id,
+            r.started_at_utc,
+            r.finished_at_utc,
+            r.status,
+            r.row_count,
+            r.day_count,
+            r.notes,
+            a.model_type,
+            a.feature_set_version,
+            a.created_at_utc AS artifact_created_at_utc
+        FROM lightgbm_training_runs r
+        LEFT JOIN lightgbm_model_artifacts a
+          ON a.run_id = r.id
+        ORDER BY r.id DESC, a.id DESC
         LIMIT 1;
 
         CREATE VIEW vw_bocpd_feature_stream AS

@@ -17,6 +17,9 @@ from .lightgbm_train import run_lightgbm_training_job
 
 def get_diagnostics(conn: sqlite3.Connection) -> dict[str, object]:
     raw_event_count = conn.execute("SELECT COUNT(*) FROM raw_events").fetchone()[0]
+    ingestion_rules_count = conn.execute(
+        "SELECT COUNT(*) FROM ingestion_rules"
+    ).fetchone()[0]
     feature_count = conn.execute("SELECT COUNT(*) FROM features").fetchone()[0]
     label_count = conn.execute("SELECT COUNT(*) FROM labels").fetchone()[0]
     lightgbm_status = conn.execute(
@@ -45,6 +48,7 @@ def get_diagnostics(conn: sqlite3.Connection) -> dict[str, object]:
     return {
         "timestamp_utc": datetime.now(UTC).replace(microsecond=0).isoformat(),
         "raw_event_count": raw_event_count,
+        "ingestion_rules_count": ingestion_rules_count,
         "feature_count": feature_count,
         "label_count": label_count,
         "lightgbm_last_status": lightgbm_status[0] if lightgbm_status else None,
@@ -73,14 +77,34 @@ class AppDaemonMLDataLayer:
     ) -> int | None:
         conn = connect(self.db_path)
         try:
+            state_value = str(state) if state is not None else None
+            if (
+                entity_id is not None
+                and state_value is not None
+                and event_type == "state_changed"
+            ):
+                allowed = conn.execute(
+                    """
+                    SELECT 1
+                    FROM ingestion_rules
+                    WHERE entity_id = ? AND state = ?
+                    LIMIT 1
+                    """,
+                    (entity_id, state_value),
+                ).fetchone()
+                if allowed is None:
+                    return None
+
             row_id = record_raw_event(
                 conn,
                 event_type=event_type,
                 entity_id=entity_id,
-                state=state,
+                state=state_value,
                 attributes=attributes,
                 occurred_at=occurred_at,
             )
+            if row_id is None:
+                return None
             conn.execute(
                 """
                 INSERT INTO metadata(key, value, updated_at_utc)

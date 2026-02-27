@@ -47,5 +47,17 @@ def test_lightgbm_contract_views_have_expected_shape(tmp_path: Path) -> None:
         ).fetchone()
         assert latest["model_type"] == "lightgbm_like"
         assert latest["feature_set_version"] == "v1"
+
+        latest_training = conn.execute(
+            """
+            SELECT status, row_count, day_count, notes, model_type
+            FROM vw_lightgbm_latest_training_result
+            """
+        ).fetchone()
+        assert latest_training["status"] == "completed"
+        assert latest_training["row_count"] == 1
+        assert latest_training["day_count"] == 1
+        assert latest_training["notes"] == "ok"
+        assert latest_training["model_type"] == "lightgbm_like"
     finally:
         conn.close()

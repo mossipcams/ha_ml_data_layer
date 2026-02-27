@@ -14,6 +14,7 @@ def test_integration_pull_contracts_are_versioned_and_stable(tmp_path: Path) -> 
         contract_info = validate_pull_contracts(conn)
         assert contract_info["contract_version"] == "2"
         assert "vw_lightgbm_latest_model_artifact" in contract_info["views"]
+        assert "vw_lightgbm_latest_training_result" in contract_info["views"]
         assert "vw_bocpd_latest_state" in contract_info["views"]
     finally:
         conn.close()

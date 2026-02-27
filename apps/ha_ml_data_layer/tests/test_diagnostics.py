@@ -30,11 +30,18 @@ def test_diagnostics_report_readiness_and_degraded_state(tmp_path: Path) -> None
             ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at_utc = excluded.updated_at_utc
             """
         )
+        conn.execute(
+            """
+            INSERT INTO ingestion_rules(entity_id, state, source, updated_at_utc)
+            VALUES ('sensor.a', 'on', 'mindml:test', '2026-02-25T01:10:00+00:00')
+            """
+        )
         conn.commit()
 
         diag = get_diagnostics(conn)
         assert diag["raw_event_count"] == 1
         assert diag["degraded"] is True
+        assert diag["ingestion_rules_count"] == 1
         assert "lightgbm_last_status" in diag
         assert diag["last_retention_at"] == "2026-02-25T01:10:00+00:00"
     finally:

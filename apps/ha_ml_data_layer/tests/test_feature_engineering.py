@@ -37,3 +37,41 @@ def test_compute_window_features_is_deterministic(tmp_path: Path) -> None:
         assert rows[1]["feature_value"] == 2 / 3
     finally:
         conn.close()
+
+
+def test_compute_window_features_uses_ingestion_rules_when_present(tmp_path: Path) -> None:
+    db_path = tmp_path / "ha_ml_data_layer.db"
+    ensure_schema(db_path)
+    conn = connect(db_path)
+    try:
+        conn.execute(
+            """
+            INSERT INTO ingestion_rules(entity_id, state, source, updated_at_utc)
+            VALUES ('a', 'on', 'mindml:entry-1', '2026-02-25T00:00:00+00:00')
+            """
+        )
+        conn.commit()
+
+        t1 = datetime(2026, 2, 25, 0, 5, tzinfo=UTC)
+        t2 = datetime(2026, 2, 25, 0, 10, tzinfo=UTC)
+        t3 = datetime(2026, 2, 25, 0, 20, tzinfo=UTC)
+        record_raw_event(conn, event_type="state_changed", entity_id="a", state="on", occurred_at=t1)
+        record_raw_event(conn, event_type="state_changed", entity_id="a", state="off", occurred_at=t2)
+        record_raw_event(conn, event_type="state_changed", entity_id="b", state="on", occurred_at=t3)
+
+        compute_window_features(
+            conn,
+            window_start=t1,
+            window_end=datetime(2026, 2, 25, 1, 0, tzinfo=UTC),
+            feature_set_version="v1",
+        )
+
+        rows = conn.execute(
+            "SELECT feature_name, feature_value FROM features ORDER BY feature_name ASC"
+        ).fetchall()
+        assert rows[0]["feature_name"] == "event_count"
+        assert rows[0]["feature_value"] == 1
+        assert rows[1]["feature_name"] == "on_ratio"
+        assert rows[1]["feature_value"] == 1.0
+    finally:
+        conn.close()

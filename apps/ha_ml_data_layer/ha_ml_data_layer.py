@@ -10,16 +10,6 @@ import appdaemon.plugins.hass.hassapi as hass
 
 from appdaemon_ml.app import AppDaemonMLDataLayer as CoreDataLayer
 
-DEFAULT_IMPORTANT_OBSERVATIONS: dict[str, set[str]] = {
-    "binary_sensor.bedtime": {"on"},
-    "sensor.matts_iphone_ble_area": {"Bedroom", "Living Room"},
-    "device_tracker.mattiphone": {"home"},
-    "binary_sensor.door_sensor_group": {"off"},
-    "input_boolean.thermostat_motion_toggle": {"off"},
-    "input_boolean.almost_bedtime": {"on"},
-    "binary_sensor.apollo_msr_2_173d50_radar_target": {"on"},
-}
-
 
 class AppDaemonMLDataLayer(hass.Hass):
     """AppDaemon-compatible wrapper around the core data-layer class."""
@@ -39,7 +29,6 @@ class AppDaemonMLDataLayer(hass.Hass):
         self._retention_time = self.args.get("retention_time", "04:00:00")
         self._raw_retention_days = int(self.args.get("raw_retention_days", 30))
         self._feature_retention_days = int(self.args.get("feature_retention_days", 90))
-        self._important_observations = DEFAULT_IMPORTANT_OBSERVATIONS
 
         timezone_name = self._timezone_name
         self._core = CoreDataLayer(db_path=db_path, timezone_name=timezone_name)
@@ -56,17 +45,9 @@ class AppDaemonMLDataLayer(hass.Hass):
         if not entity_id or state is None:
             return
 
-        allowed_states = self._important_observations.get(entity_id)
-        if not allowed_states:
-            return
-
         state_str = str(state)
-        is_match = state_str in allowed_states
-        if not is_match:
-            return
 
         attributes: dict[str, Any] = {
-            "important_observation": True,
             "entity_id": entity_id,
             "state": state_str,
         }

@@ -27,6 +27,15 @@ def compute_window_features(
         FROM raw_events
         WHERE occurred_at_utc >= ?
           AND occurred_at_utc < ?
+          AND (
+              NOT EXISTS (SELECT 1 FROM ingestion_rules)
+              OR EXISTS (
+                  SELECT 1
+                  FROM ingestion_rules r
+                  WHERE r.entity_id = raw_events.entity_id
+                    AND r.state = raw_events.state
+              )
+          )
         ORDER BY occurred_at_utc ASC
         """,
         (start_utc, end_utc),

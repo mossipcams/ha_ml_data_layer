@@ -28,6 +28,7 @@ def test_ensure_schema_creates_v1_tables_views_and_metadata(tmp_path: Path) -> N
 
         expected_tables = {
             "raw_events",
+            "ingestion_rules",
             "features",
             "labels",
             "lightgbm_training_runs",
@@ -41,6 +42,7 @@ def test_ensure_schema_creates_v1_tables_views_and_metadata(tmp_path: Path) -> N
         expected_views = {
             "vw_lightgbm_training_dataset",
             "vw_lightgbm_latest_model_artifact",
+            "vw_lightgbm_latest_training_result",
             "vw_bocpd_feature_stream",
             "vw_bocpd_latest_state",
             "vw_latest_feature_snapshot",
@@ -54,6 +56,14 @@ def test_ensure_schema_creates_v1_tables_views_and_metadata(tmp_path: Path) -> N
         assert keys["schema_version"] == "2"
         assert keys["feature_set_version"] == "v1"
         assert keys["contract_version"] == "2"
+
+        indexes = {
+            row[0]
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='index' AND name IS NOT NULL"
+            ).fetchall()
+        }
+        assert "idx_ingestion_rules_entity_state" in indexes
     finally:
         conn.close()
 

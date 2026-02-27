@@ -49,7 +49,7 @@ def test_initialize_registers_event_listener_and_nightly_schedule(monkeypatch) -
     assert schedules[1][1] == "04:00:00"
 
 
-def test_on_ha_event_only_records_important_entities_and_states() -> None:
+def test_on_ha_event_forwards_entity_and_state_to_core() -> None:
     _install_fake_appdaemon_hass()
     module = importlib.import_module("ha_ml_data_layer")
     app = module.AppDaemonMLDataLayer.__new__(module.AppDaemonMLDataLayer)
@@ -61,27 +61,16 @@ def test_on_ha_event_only_records_important_entities_and_states() -> None:
             calls.append(kwargs)
 
     app._core = FakeCore()
-    app._important_observations = {
-        "sensor.matts_iphone_ble_area": {"Bedroom", "Living Room"},
-        "binary_sensor.bedtime": {"on"},
-    }
 
     app._on_ha_event(
         "state_changed",
-        {"entity_id": "sensor.unimportant", "new_state": {"state": "on"}},
-        {},
-    )
-    assert len(calls) == 0
-
-    app._on_ha_event(
-        "state_changed",
-        {"entity_id": "sensor.matts_iphone_ble_area", "new_state": {"state": "Bedroom"}},
+        {"entity_id": "sensor.anything", "new_state": {"state": "on"}},
         {},
     )
     assert len(calls) == 1
-    assert calls[0]["entity_id"] == "sensor.matts_iphone_ble_area"
-    assert calls[0]["state"] == "Bedroom"
-    assert calls[0]["attributes"]["important_observation"] is True
+    assert calls[0]["entity_id"] == "sensor.anything"
+    assert calls[0]["state"] == "on"
+    assert calls[0]["attributes"]["entity_id"] == "sensor.anything"
 
 
 def test_retention_callback_uses_configured_days() -> None:
